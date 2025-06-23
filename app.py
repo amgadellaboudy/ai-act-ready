@@ -1,10 +1,9 @@
 # app.py  ────────────────────────────────────────────────────────
 import os, tempfile, textwrap, json, git, asyncio, streamlit as st
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.schema import HumanMessage
 from langchain_community.vectorstores import FAISS
-from langchain.embeddings import OpenAIEmbeddings
 
 # ──────────── 1. Environment & LLM  ────────────
 load_dotenv()
@@ -21,38 +20,43 @@ st.title("EU AI Act Readiness – MVP")
 # ──────────── 2. Tabs layout  ────────────
 tab_chat, tab_scan = st.tabs(["Chat assistant", "Repo scan"])
 
-if prompt := st.chat_input("Type your question"):
-    # 1)  Grab 4 most relevant Act chunks for this question
-    hits = store.similarity_search(prompt, k=4)
-    context = "\n\n".join(h.page_content for h in hits)
+with tab_chat:
+    st.info("Ask anything about the EU AI Act.")
 
-    # 2)  Build the prompt: guard-rail + retrieved context
-    system_msg = (
-        "\n\nUse the **context** below to answer. "
-        "If the question is unrelated to the EU AI Act, "
-        "reply: \"I'm sorry, I'm not qualified to answer that.\"\n\n"
-        "### Context ###\n" + context
-    )
+    if "history" not in st.session_state:
+        st.session_state.history = []
+    if prompt := st.chat_input("Type your question"):
+        # 1)  Grab 4 most relevant Act chunks for this question
+        hits = store.similarity_search(prompt, k=4)
+        context = "\n\n".join(h.page_content for h in hits)
 
-    messages = [
-        {"role": "system", "content": system_msg},
-        *st.session_state.history,
-        {"role": "user", "content": prompt},
-    ]
+        # 2)  Build the prompt: guard-rail + retrieved context
+        system_msg = (
+            "\n\nUse the **context** below to answer. "
+            "If the question is unrelated to the EU AI Act, "
+            "reply: \"I'm sorry, I'm not qualified to answer that.\"\n\n"
+            "### Context ###\n" + context
+        )
 
-    # 3)  Stream answer
-    stream_area = st.chat_message("assistant").empty()
-    response = ""
-    for chunk in llm.stream(messages):
-        response += chunk.content or ""
-        stream_area.markdown(response + "▌")
-    stream_area.markdown(response)
+        messages = [
+            {"role": "system", "content": system_msg},
+            *st.session_state.history,
+            {"role": "user", "content": prompt},
+        ]
 
-    # 4)  Persist turn
-    st.session_state.history.extend([
-        {"role": "user", "content": prompt},
-        {"role": "assistant", "content": response},
-    ])
+        # 3)  Stream answer
+        stream_area = st.chat_message("assistant").empty()
+        response = ""
+        for chunk in llm.stream(messages):
+            response += chunk.content or ""
+            stream_area.markdown(response + "▌")
+        stream_area.markdown(response)
+
+        # 4)  Persist turn
+        st.session_state.history.extend([
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": response},
+        ])
 
 
 # ──────────── 5. Worker coroutine  ────────────
