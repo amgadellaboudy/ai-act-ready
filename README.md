@@ -60,3 +60,26 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+---
+
+## 👋 Work With Me
+
+I'm an AI engineer who specializes in building real-world, production-grade GPT agents and compliance copilots like this one. If you're:
+
+- A company looking to integrate GPT into your product or internal workflows  
+- A founder who needs a personalized AI assistant for your team or users  
+- A legal, recruiting, or real estate firm exploring AI automation  
+
+📩 I offer:
+- Custom GPT builds trained on your data  
+- Compliance-focused RAG agents  
+- Lightweight AI audits to help you identify where LLMs can save time or money  
+
+If you're interested in adapting this project—or building something custom from scratch—feel free to reach out.
+
+📧 Email: [amgad.ellaboudy@gmail.com](mailto:amgad.ellaboudy@gmail.com)  
+🔗 LinkedIn: [linkedin.com/in/amgadellaboudy](https://www.linkedin.com/in/amgad-ellaboudy-aa596726/)
+
+---
+
+
