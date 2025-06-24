@@ -45,7 +45,7 @@ git clone https://github.com/amgadellaboudy/ai-act-ready.git
 cd ai-act-ready
 
 # Set up a virtual environment (optional)
-python -m venv venvsource venv/bin/activate
+python -m venv venv
 
 MacOS:
 source venv/bin/activate
