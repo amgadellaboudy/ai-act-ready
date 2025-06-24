@@ -23,3 +23,4 @@ vectorstore = FAISS.from_documents(docs, emb)
 # Persist FAISS index to disk (recommended)
 faiss_dir = "faiss_index"
 vectorstore.save_local(faiss_dir)
+
