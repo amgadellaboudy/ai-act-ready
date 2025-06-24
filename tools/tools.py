@@ -3,7 +3,7 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import ChatPromptTemplate
-from schemas import AuditResult
+from tools.schemas import AuditResult
 from typing import Dict, Union
 import asyncio
 
