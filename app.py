@@ -1,9 +1,9 @@
 # app.py  ────────────────────────────────────────────────────────
-import json, asyncio, streamlit as st
+import json, streamlit as st
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from tools import run_minimal_mvp_scan
+from tools.tools import run_minimal_mvp_scan
 
 
 # ──────────── 1. Environment & LLM  ────────────
