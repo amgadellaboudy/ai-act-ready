@@ -1,9 +1,10 @@
 # app.py  ────────────────────────────────────────────────────────
-import os, tempfile, textwrap, json, git, asyncio, streamlit as st
+import json, asyncio, streamlit as st
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain.schema import HumanMessage
 from langchain_community.vectorstores import FAISS
+from tools import run_minimal_mvp_scan
+
 
 # ──────────── 1. Environment & LLM  ────────────
 load_dotenv()
@@ -26,16 +27,17 @@ with tab_chat:
     if "history" not in st.session_state:
         st.session_state.history = []
     if prompt := st.chat_input("Type your question"):
+        st.chat_message("user").markdown(prompt)
         # 1)  Grab 4 most relevant Act chunks for this question
         hits = store.similarity_search(prompt, k=4)
         context = "\n\n".join(h.page_content for h in hits)
 
         # 2)  Build the prompt: guard-rail + retrieved context
         system_msg = (
-            "\n\nUse the **context** below to answer. "
-            "If the question is unrelated to the EU AI Act, "
-            "reply: \"I'm sorry, I'm not qualified to answer that.\"\n\n"
-            "### Context ###\n" + context
+                "You are an expert on the EU AI Act. Use the **context** below to help answer the user's question. "
+                "If the question is clearly unrelated to the EU AI Act, respond with: \"I'm sorry, I'm not"
+                "qualified to answer that.\"If the context doesn't directly answer the question, rely on your own"
+                "knowledge of the EU AI Act. \n\n ### Context ###\n" + context
         )
 
         messages = [
@@ -59,55 +61,68 @@ with tab_chat:
         ])
 
 
-# ──────────── 5. Worker coroutine  ────────────
-async def run_scan(repo_url: str, llm: ChatOpenAI) -> dict:
-    """Clone repo (shallow), sample up to 500 source files,
-       ask GPT-4o to generate risk assessment."""
-    tmp = tempfile.mkdtemp()
-    git.Repo.clone_from(repo_url, tmp, depth=1)
-
-    # collect snippets (first 300 lines) of .py/.js/.ts/.ipynb
-    corpus, count = "", 0
-    for root, _, files in os.walk(tmp):
-        for f in files:
-            if f.endswith((".py", ".js", ".ts", ".ipynb")) and count < 500:
-                path = os.path.join(root, f)
-                try:
-                    with open(path, "r", errors="ignore") as fp:
-                        snippet = "".join(fp.readlines()[:300])
-                    corpus += f"\n\n# File: {f}\n{snippet}"
-                    count += 1
-                except Exception:
-                    pass
-
-    prompt = textwrap.dedent(f"""
-    You are an AI compliance auditor. Analyse the code snapshot below.
-    Return valid JSON with keys:
-      tier  : one of ["minimal","limited","high","unacceptable"]
-      actions : array of <=10 concise mandatory actions
-      model_card_md : GitHub-flavored Markdown describing the model
-    CODE_START
-    {corpus}
-    CODE_END
-    """)
-    raw = (await llm.agenerate([[HumanMessage(content=prompt)]])).generations[0][0].text
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return {"error": "LLM returned malformed JSON", "raw": raw}
-
 # ──────────── 4. Repo scanner  ────────────
 with tab_scan:
     st.markdown("### 1-click AI-Act assessment for your repo")
     repo_url = st.text_input("Public GitHub repository URL")
+
+    if "audit_chat_history" not in st.session_state:
+        st.session_state.audit_chat_history = []
+
     if st.button("Run assessment", disabled=not repo_url):
-        with st.spinner("Cloning & analysing…"):
-            report = asyncio.run(run_scan(repo_url, llm))
+        with st.spinner("Analysing…"):
+            # Vector search
+            report = run_minimal_mvp_scan(repo_url, llm, store)
+            st.session_state.audit_report = report.model_dump(mode="json") # Save it for follow-up chat
             st.success("Done!")
-            st.json(report)
-            st.download_button("Download JSON",
-                               json.dumps(report, indent=2),
-                               file_name="ai-act-report.json",
-                               mime="application/json")
+            st.json(st.session_state.audit_report)
 
+    # Interactive chat after report is generated
+    if "audit_report" in st.session_state:
+        st.markdown("### Audit Report")
+        st.json(st.session_state.audit_report)
+        st.divider()
+        st.markdown("### What would you like to know about the repo audit or the EU AI Act?")
 
+        for msg in st.session_state.audit_chat_history:
+            st.chat_message(msg["role"]).markdown(msg["content"])
+
+        if user_q := st.chat_input("Ask a question"):
+            st.chat_message("user").markdown(user_q)
+            # Build context from EU AI Act chunks
+            relevant_chunks = store.similarity_search(user_q, k=4)
+            context = "\n\n".join([f"[Context chunk]\n{c.page_content}" for c in relevant_chunks])
+
+            # System prompt includes audit report and guardrails
+            sys_prompt = f"""You are an expert EU AI Act compliance expert.
+            You have just produced the following audit report for a GitHub repo:
+            {json.dumps(st.session_state.audit_report, indent=2)}
+            It includes a risk tier,actionable items, and a model card. You may answer follow-up questions that:
+            - Clarify the meaning or reasoning behind the audit
+            - Explore next steps to implement the recommendations
+            - Ask for help planning or executing remediations
+            - Refer to specific content from the EU AI Act or the JSON audit
+        
+            If the user asks something *unrelated to the audit* or *not relevant to AI compliance*,
+            politely explain that you're focused only on EU AI Act matters.
+        
+            Relevant context:
+            {context}
+            """
+            messages = [{"role": "system", "content": sys_prompt}] + \
+                       st.session_state.audit_chat_history + \
+                       [{"role": "user", "content": user_q}]
+
+            # Stream reply
+            stream_area = st.chat_message("assistant").empty()
+            response = ""
+            for chunk in llm.stream(messages):
+                response += chunk.content or ""
+                stream_area.markdown(response + "▌")
+            stream_area.markdown(response)
+
+            # Update chat history
+            st.session_state.audit_chat_history.extend([
+                {"role": "user", "content": user_q},
+                {"role": "assistant", "content": response},
+            ])
