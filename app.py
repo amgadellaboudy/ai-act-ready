@@ -15,8 +15,8 @@ emb = OpenAIEmbeddings(model="text-embedding-3-small")
 store = FAISS.load_local("faiss_index", emb,
                          allow_dangerous_deserialization=True)
 
-st.set_page_config(page_title="EU AI-Act Ready MVP", layout="centered")
-st.title("EU AI Act Readiness – MVP")
+st.set_page_config(page_title="EU AI-Act Ready App", layout="centered")
+st.title("EU AI Act Readiness App")
 
 # ──────────── 2. Tabs layout  ────────────
 tab_chat, tab_scan = st.tabs(["Chat assistant", "Repo scan"])
@@ -75,7 +75,6 @@ with tab_scan:
             report = run_minimal_mvp_scan(repo_url, llm, store)
             st.session_state.audit_report = report.model_dump(mode="json") # Save it for follow-up chat
             st.success("Done!")
-            st.json(st.session_state.audit_report)
 
     # Interactive chat after report is generated
     if "audit_report" in st.session_state:
