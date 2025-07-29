@@ -22,14 +22,6 @@ Built with OpenAI + LangChain, this interactive tool allows you to ask questions
 - ✅ Legal & Policy Teams: Quickly explore or summarize legal text
 - ✅ AI Engineers: Build your own compliance agent using this base
 
----
-
-## 🚀 Demo (WIP)
-
-![Demo](demo/demo.gif)
-
-> *“What are the obligations for general-purpose AI systems?”*  
-→ GPT summarizes Article 52, 53 with references and plain-English breakdown.
 
 ---
 
